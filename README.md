@@ -43,7 +43,7 @@ Create a clean environment
 
 Clone or download this repository and open a terminal in the project directory.
 
-Create and activate a virtual environment if desired, then install the dependencies listed above.
+Create and activate a virtual environment before the code execution, then install the dependencies listed above.
 
 ```bash
 py -m venv .venv
