@@ -51,6 +51,63 @@ def diagnose_missing_values(df: pd.DataFrame) -> None:
     print(by_class.sort_values("pct_dropped", ascending=False))
 
 
+def diagnose_fallback_recovery(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Reports how many beats are dropped vs. retained under:
+      1. DWT only
+      2. DWT + CWT fallback (what the pipeline actually does)
+      3. The difference = beats recovered by the CWT fallback
+
+    "Dropped" here means the STRICT rule: a beat is dropped if ANY of the
+    9 features is missing (the all-or-nothing rule the relaxed pipeline
+    was built to improve on).
+
+    How DWT-only is reconstructed from ecg_features_raw.csv: the CWT
+    fallback only ever FILLS points that DWT left empty, and
+    'recovered_by_fallback' flags every beat where it filled at least one.
+    All 5 delineation points feed at least one of the 4 morphological
+    features, so:
+      - complete NOW and recovered_by_fallback  -> was incomplete under DWT only
+      - complete NOW and not recovered          -> complete under DWT only too
+      - incomplete NOW                          -> incomplete under DWT only too
+    So the beat-level totals below are exact, not estimates.
+    """
+    if "recovered_by_fallback" not in df.columns:
+        print("\n[skipped] 'recovered_by_fallback' column not found in the CSV - "
+              "re-run feature extraction so ecg_features_raw.csv includes it.")
+        return pd.DataFrame()
+
+    total = len(df)
+    complete_final = df[FEATURE_COLUMNS].notna().all(axis=1)
+    recovered = df["recovered_by_fallback"].astype(bool)
+
+    complete_dwt = complete_final & ~recovered   # retained under DWT only
+    gained = complete_final & recovered          # retained ONLY thanks to CWT
+
+    retained_dwt, retained_both = int(complete_dwt.sum()), int(complete_final.sum())
+    dropped_dwt, dropped_both = total - retained_dwt, total - retained_both
+
+    print("\n=== Beats dropped vs. retained: DWT only vs. DWT + CWT fallback ===")
+    print(f"  {'':<22}{'Retained':>10}{'Dropped':>10}{'% retained':>12}")
+    print(f"  {'DWT only':<22}{retained_dwt:>10}{dropped_dwt:>10}{100 * retained_dwt / total:>11.2f}%")
+    print(f"  {'DWT + CWT fallback':<22}{retained_both:>10}{dropped_both:>10}{100 * retained_both / total:>11.2f}%")
+    print(f"  {'Difference (recovered)':<22}{retained_both - retained_dwt:>+10}{dropped_both - dropped_dwt:>+10}"
+          f"{100 * (retained_both - retained_dwt) / total:>+11.2f}%")
+
+    print("\n=== Beats recovered by the CWT fallback, by AAMI class ===")
+    by_class = pd.DataFrame({
+        "total_beats": df.groupby("label").size(),
+        "dropped_dwt_only": (~complete_dwt).groupby(df["label"]).sum(),
+        "dropped_dwt_cwt": (~complete_final).groupby(df["label"]).sum(),
+        "recovered": gained.groupby(df["label"]).sum(),
+    })
+    by_class["pct_of_dwt_drops_recovered"] = (
+        100 * by_class["recovered"] / by_class["dropped_dwt_only"].replace(0, pd.NA)
+    ).astype(float).round(2)
+    print(by_class)
+    return by_class
+
+
 def plot_feature_distributions(df: pd.DataFrame) -> None:
     """
     Plots a histogram of every feature, one subplot per feature, split
@@ -142,6 +199,7 @@ if __name__ == "__main__":
     print(f"Total beats (before dropping): {len(df)}\n")
 
     diagnose_missing_values(df)
+    diagnose_fallback_recovery(df)
     crossed = diagnose_missing_by_class_and_feature(df)
     plot_missing_heatmap(crossed)
     plot_feature_distributions(df)

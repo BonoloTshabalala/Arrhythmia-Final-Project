@@ -20,11 +20,13 @@ Install what this script needs:
     pip install scikit-learn imbalanced-learn joblib
 """
 
+import sys
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from imblearn.pipeline import Pipeline
 from imblearn.over_sampling import SMOTE
+from collections import Counter
 import joblib
 
 # IMPORTANT: build_sampling_strategy must live in its own shared file
@@ -43,6 +45,29 @@ from smote_utils import build_sampling_strategy
 # safely-conservative k=3 here rather than risk a fold where k=5 isn't
 # achievable and the whole grid search crashes partway through.
 SMOTE_K_NEIGHBORS = 3
+
+# k used ONLY for the full-training-partition SMOTE count report below.
+# The full training set is bigger than any single fold, so even the rarest
+# class has enough real examples for k=5 there. NOTE: this is a reporting
+# figure - the model that actually gets tuned/saved still uses
+# SMOTE_K_NEIGHBORS above, because folds are smaller. Class COUNTS after
+# SMOTE are set by build_sampling_strategy, not by k, so they are the
+# same either way; k only changes where the synthetic points land.
+SMOTE_K_REPORT = 5
+CLASS_ORDER = ["N", "S", "V", "F", "Q"]
+
+
+class _Tee:
+    """Copies everything printed to the terminal into a text file as well."""
+    def __init__(self, path):
+        self.file = open(path, "w", encoding="utf-8")
+        self.stdout = sys.stdout
+    def write(self, text):
+        self.stdout.write(text)
+        self.file.write(text)
+    def flush(self):
+        self.stdout.flush()
+        self.file.flush()
 
 
 def build_pipeline() -> Pipeline:
@@ -111,7 +136,82 @@ def log_fold_composition(X_train, y_train, cv) -> pd.DataFrame:
     return log_df
 
 
+def report_smote_counts_full_training(X_train, y_train, k_report: int = SMOTE_K_REPORT) -> pd.DataFrame:
+    """
+    Training class counts BEFORE and AFTER SMOTE on the full training
+    partition (not per-fold) - actually runs SMOTE once, purely to count
+    the result. Nothing from this run is used for the model.
+    """
+    before = Counter(y_train)
+    min_count = min(before.values())
+    k_used = min(k_report, min_count - 1)
+    if k_used < k_report:
+        print(f"WARNING: rarest class has only {min_count} examples, so k={k_report} is not "
+              f"possible - using k={k_used} for this report instead.")
+
+    smote = SMOTE(sampling_strategy=build_sampling_strategy, k_neighbors=k_used, random_state=42)
+    _, y_res = smote.fit_resample(X_train, y_train)
+    after = Counter(y_res)
+
+    classes = [c for c in CLASS_ORDER if c in after or c in before] + \
+              sorted((set(before) | set(after)) - set(CLASS_ORDER))
+    rows = []
+    for cls in classes:
+        b, a = before.get(cls, 0), after.get(cls, 0)
+        rows.append({
+            "class": cls,
+            "before_smote": b,
+            "after_smote": a,
+            "synthetic_added": a - b,
+            "pct_of_train_before": round(100 * b / sum(before.values()), 2),
+            "pct_of_train_after": round(100 * a / sum(after.values()), 2),
+        })
+    total = {"class": "TOTAL", "before_smote": sum(before.values()), "after_smote": sum(after.values()),
+             "synthetic_added": sum(after.values()) - sum(before.values()),
+             "pct_of_train_before": 100.0, "pct_of_train_after": 100.0}
+    table = pd.DataFrame(rows + [total])
+
+    print(f"\nTraining class counts before/after SMOTE (full training partition, k = {k_used}):")
+    print(table.to_string(index=False))
+    table.to_csv("smote_class_counts_full_training.csv", index=False)
+    print("\nSaved smote_class_counts_full_training.csv\n")
+    return table
+
+
+def print_final_report(grid_search, param_grid, n_train, class_table, fold_log) -> None:
+    """One consolidated block with everything this script reports, in one place."""
+    print("\n" + "=" * 70)
+    print("FINAL TRAINING REPORT")
+    print("=" * 70)
+    n_combos = 1
+    for v in param_grid.values():
+        n_combos *= len(v)
+    print(f"Training beats: {n_train}")
+    print(f"Grid: {n_combos} parameter combinations x 5 folds = {n_combos * 5} model fits "
+          f"(scoring: recall_macro)")
+    print(f"Best parameters: {grid_search.best_params_}")
+    print(f"Best cross-validated macro recall: {grid_search.best_score_:.4f}")
+
+    res = pd.DataFrame(grid_search.cv_results_)
+    top = res.sort_values("rank_test_score").head(5)[
+        ["rank_test_score", "mean_test_score", "std_test_score", "mean_fit_time", "params"]]
+    print("\nTop 5 parameter combinations (mean/std of macro recall across the 5 folds):")
+    print(top.to_string(index=False))
+
+    print("\nClass counts before/after SMOTE (full training partition):")
+    print(class_table.to_string(index=False))
+
+    print("\nFold composition (real count / SMOTE target / validation count):")
+    wide = fold_log.pivot(index="class", columns="fold",
+                          values=["real_count_in_fold_training_portion",
+                                  "smote_target_for_this_fold",
+                                  "count_in_fold_validation_portion"])
+    print(wide.to_string())
+    print("=" * 70)
+
+
 if __name__ == "__main__":
+    sys.stdout = _Tee("training_report.txt")   # everything printed below is also saved here
     X_train = pd.read_csv("X_train_relaxed.csv")   # NOTE: the PRE-SMOTE file - SMOTE now lives inside the pipeline
     y_train = pd.read_csv("y_train_relaxed.csv").squeeze("columns")
 
@@ -128,7 +228,10 @@ if __name__ == "__main__":
     # Log the REAL per-fold numbers before the actual (slow) grid search
     # starts - this is quick (just counting, not training anything) and
     # gives exact, reportable figures rather than approximations.
-    log_fold_composition(X_train, y_train, cv)
+    fold_log = log_fold_composition(X_train, y_train, cv)
+
+    # Class counts before/after SMOTE on the FULL training partition (k = 5)
+    class_table = report_smote_counts_full_training(X_train, y_train)
 
     # n_jobs here controls how many (pipeline, fold) combinations run at
     # once. Each Random Forest inside is already set to n_jobs=1 above,
@@ -176,3 +279,6 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(grid_search.cv_results_)
     results_df.to_csv("gridsearch_cv_results.csv", index=False)
     print("Saved gridsearch_cv_results.csv (full results for all 48 parameter combinations)")
+
+    print_final_report(grid_search, param_grid, len(X_train), class_table, fold_log)
+    print("\nSaved training_report.txt (everything printed by this script)")

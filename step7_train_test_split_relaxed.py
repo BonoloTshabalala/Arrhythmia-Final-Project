@@ -170,6 +170,30 @@ def drop_fully_synthetic_beats(df: pd.DataFrame, set_name: str) -> pd.DataFrame:
     return df.loc[~fully_synthetic].reset_index(drop=True)
 
 
+def print_dropped_summary(n_train_before: int, n_test_before: int, dropped_by_class: pd.DataFrame) -> None:
+    """
+    One-glance total of every beat removed by the n_imputed == 3 rule
+    (train + test combined), so the headline number doesn't have to be
+    added up by hand from the two separate per-set printouts above.
+    """
+    train_dropped = int(dropped_by_class["TRAIN"].sum()) if "TRAIN" in dropped_by_class else 0
+    test_dropped = int(dropped_by_class["TEST"].sum()) if "TEST" in dropped_by_class else 0
+    total_dropped = train_dropped + test_dropped
+    total_before = n_train_before + n_test_before
+
+    print("\n=== TOTAL beats dropped in this step (n_imputed == 3: no real morphological measurement) ===")
+    print(f"  TOTAL dropped: {total_dropped} of {total_before} beats "
+          f"({100 * total_dropped / total_before:.2f}%)")
+    print(f"    TRAIN: {train_dropped} of {n_train_before} ({100 * train_dropped / n_train_before:.2f}%)")
+    print(f"    TEST:  {test_dropped} of {n_test_before} ({100 * test_dropped / n_test_before:.2f}%)")
+    print(f"  Beats retained: {total_before - total_dropped}")
+    if total_dropped > 0:
+        dropped_by_class = dropped_by_class.copy()
+        dropped_by_class["TOTAL"] = dropped_by_class.sum(axis=1)
+        print("  By class:")
+        print(dropped_by_class.to_string())
+
+
 def print_split_summary(y_train, y_test) -> None:
     """Same class-distribution summary as the strict version's Step 5."""
     print(f"\nTraining set: {len(y_train)} beats from {len(TRAIN_RECORDS)} records")
@@ -215,8 +239,14 @@ if __name__ == "__main__":
     # 4) Final quality floor: drop beats with ZERO real morphological
     #    measurement left (n_imputed == 3) - see drop_fully_synthetic_beats()
     #    docstring for why this specific, narrow cut is worth making.
+    n_train_before, n_test_before = len(train_df), len(test_df)
+    dropped_by_class = pd.concat([
+        train_df.loc[train_df["n_imputed"] == 3, "label"].value_counts().rename("TRAIN"),
+        test_df.loc[test_df["n_imputed"] == 3, "label"].value_counts().rename("TEST"),
+    ], axis=1).fillna(0).astype(int)
     train_df = drop_fully_synthetic_beats(train_df, "TRAIN")
     test_df = drop_fully_synthetic_beats(test_df, "TEST")
+    print_dropped_summary(n_train_before, n_test_before, dropped_by_class)
 
     X_train = train_df[FEATURE_COLUMNS]
     y_train = train_df["label"]
