@@ -37,7 +37,6 @@ pip install numpy pandas scipy scikit-learn imbalanced-learn wfdb neurokit2 matp
 ```bash
 python -m pip install -r requirements.txt
 ```
-Create a clean environment 
 
 ## 4. Installation
 
@@ -60,9 +59,8 @@ Run the main pipeline scripts from the project directory in the following order:
 4. `step4_patient_labeling.py` - generates patient-level labels.
 5. `step5_feature_extraction_relaxed.py` - extracts heartbeat features while retaining selected missing values.
 6. `step7_train_test_split_relaxed.py` - creates the training and testing datasets and handles missing features.
-7. `step8 smote_random_forest_gridsearch.py` - tunes and trains the Random Forest pipeline using SMOTE.
+7. `step8_smote_random_forest_gridsearch.py` - tunes and trains the Random Forest pipeline using SMOTE.
 8. `step8_evaluation_gridsearch.py` - evaluates beat-level and patient-level predictions.
-9. `step9_feature_importance_gridsearch.py` - calculates and visualises feature importance.
 
 Run each script only after the preceding stage has completed successfully.
 
@@ -75,16 +73,15 @@ python step3_segmentation.py
 python step4_patient_labeling.py
 python step5_feature_extraction_relaxed.py
 python step7_train_test_split_relaxed.py
-python "step8 smote_random_forest_gridsearch.py"
+python "step8_smote_random_forest_gridsearch.py"
 python step8_evaluation_gridsearch.py
-python step9_feature_importance_gridsearch.py
 ```
 
 The modelling stage also requires the `smote_utils.py` helper module to be present in the project directory.
 
 ## 6. Outputs
 
-The scripts generate intermediate NumPy arrays and CSV files, a trained model, evaluation results, and feature-importance plots.
+The scripts generate intermediate NumPy arrays and CSV files, a trained model, and evaluation results.
 
 These outputs are used by subsequent stages of the pipeline. They are generated locally when the scripts execute.
 
