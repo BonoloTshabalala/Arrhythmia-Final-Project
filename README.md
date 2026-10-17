@@ -18,7 +18,7 @@ Please follow the dataset's access conditions and citation requirements.
 
 ## 3. Requirements
 
-- Python
+- Python 3.11
 - NumPy
 - Pandas
 - SciPy
@@ -31,16 +31,25 @@ Please follow the dataset's access conditions and citation requirements.
 
 Install the required packages using:
 
+
+pip install numpy pandas scipy scikit-learn imbalanced-learn wfdb neurokit2 matplotlib
+
 ```bash
 python -m pip install -r requirements.txt
 ```
+Create a clean environment 
 
 ## 4. Installation
 
 Clone or download this repository and open a terminal in the project directory.
 
-Create and activate a virtual environment if desired, then install the dependencies listed above.
+Create and activate a virtual environment before the code execution, then install the dependencies listed above.
 
+```bash
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+python -c "import sys; print(sys.executable)"
+```
 ## 5. Execution Order
 
 Run the main pipeline scripts from the project directory in the following order:
@@ -58,7 +67,7 @@ Run the main pipeline scripts from the project directory in the following order:
 Run each script only after the preceding stage has completed successfully.
 
 For example:
-Note: the following are the prompts you must call on your terminal
+Note: the following are the prompts you must call on your terminal for each step respectively.
 ```bash
 python step1_data_provenance.py
 python step2_preprocessing.py
