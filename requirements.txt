@@ -7,4 +7,3 @@ neurokit2
 scikit-learn
 imbalanced-learn
 joblib
-Python
