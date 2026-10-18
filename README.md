@@ -39,6 +39,22 @@ Open the terminal, this will open the directorry in which the repository is on.
 
 ## 5. Installation
 
+Create and activate a virtual environment before the code execution, then install the dependencies listed above in the requirements.
+
+```bash
+py -m venv .venv
+
+.venv\Scripts\Activate.ps1
+
+python -c "import sys; print(sys.executable)"
+```
+
+If PowerShell prevents the virtual environment from activating because script execution is disabled, run the following command in the current terminal session:
+
+```bash
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+Should be good after this.
 
 Install the required packages in the requirements text file using the below command:
 
@@ -46,13 +62,6 @@ pip install numpy pandas scipy scikit-learn imbalanced-learn wfdb neurokit2 matp
 
 ```bash
 python -m pip install -r requirements.txt
-```
-Create and activate a virtual environment before the code execution, then install the dependencies listed below in the requirements.
-
-```bash
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-python -c "import sys; print(sys.executable)"
 ```
 
 ## 6. Execution Order
