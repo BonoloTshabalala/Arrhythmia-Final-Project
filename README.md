@@ -39,7 +39,13 @@ Open the terminal, this will open the directorry in which the repository is on.
 
 ## 5. Installation
 
-Create and activate a virtual environment before the code execution, then install the dependencies listed above in the requirements.
+Before creating a virtual environment, run the following command in the current terminal session:
+
+```bash
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+Create and activate a virtual environment before the code execution, then install the dependencies in the requirements.
 
 ```bash
 py -m venv .venv
@@ -48,13 +54,6 @@ py -m venv .venv
 
 python -c "import sys; print(sys.executable)"
 ```
-
-If PowerShell prevents the virtual environment from activating because script execution is disabled, run the following command in the current terminal session:
-
-```bash
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
-Should be good after this.
 
 Install the required packages in the requirements text file using the below command:
 
