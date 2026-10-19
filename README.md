@@ -18,7 +18,7 @@ Please follow the dataset's access conditions and citation requirements.
 
 ## 3. Desktop Setup
 
-Clone or download this repository to a folder in your computer, and open a terminal in the project directory.
+Clone or download this repository to a folder in your computer.
 Download VS Code on your desktop.
 Open VS Code.
 Go to  Files on the top left panel, then go to Open Folder, then go to the Folder you cloned the repository to in your computer, then click open.
